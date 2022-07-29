@@ -2,12 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import parser from '@babel/parser';
 import traverse from '@babel/traverse';
-import { transformFromAst } from 'babel-core';
+import { transformFromAst } from '@babel/core';
 import ejs from 'ejs';
-import { SyncHook } from 'tapable';
+import { SyncHook, AsyncParallelHook } from 'tapable';
 
-import { jsonLoader } from './jsonLoader.js';
-import { ChangeOutputFilename } from './ChangeOutputFilename.js';
+import { jsonLoader } from './loaders/jsonLoader.js';
+import { ChangeOutputFilename } from './plugins/ChangeOutputFilename.js';
+import { HtmlPlugin } from './plugins/HtmlPlugin.js';
 
 let id = 0
 
@@ -20,11 +21,12 @@ const config = {
             },
         ],
     },
-    plugins: [new ChangeOutputFilename()]
+    plugins: [new ChangeOutputFilename(), new HtmlPlugin()]
 }
 
 const hooks = {
     emitChange: new SyncHook(['pluginContext']),
+    emitHtml: new AsyncParallelHook(['filePath', 'templatePath', 'outputPath'])
 }
 
 function initPlugins() {
@@ -81,7 +83,7 @@ function createAsset(filePath) {
     })
 
     const { code } = transformFromAst(ast, undefined, {
-        presets: ["env"]
+        presets: ["@babel/preset-env"]
     })
 
     return {
@@ -98,13 +100,13 @@ function createAsset(filePath) {
  * @returns 
  */
 function createGraph() {
-    const mainAsset = createAsset('../source/main.js')
+    const mainAsset = createAsset(path.resolve('./source/main.js'))
 
     const queue = [mainAsset]
 
     for (const asset of queue) {
         asset.deps.forEach(relativePath => {
-            const childAsset = createAsset(path.resolve('../source', relativePath))
+            const childAsset = createAsset(path.resolve('./source', relativePath))
             asset.mapping[relativePath] = childAsset.id
             queue.push(childAsset)
         });
@@ -118,7 +120,7 @@ function createGraph() {
  * @param {Array} graph 
  */
 function build(graph) {
-    const template = fs.readFileSync('./bundle.ejs', {
+    const template = fs.readFileSync('./src/bundle.ejs', {
         encoding: 'utf-8'
     })
 
@@ -141,11 +143,19 @@ function build(graph) {
         }
     }
 
+    !fs.existsSync('./dist') && fs.mkdirSync('./dist')
+
     hooks.emitChange.call(pluginContext)
 
-    !fs.existsSync('../dist') && fs.mkdirSync('../dist')
+    hooks.emitHtml.promise(
+        `./${outputFilename}`,
+        path.resolve('./src', 'template.ejs'),
+        path.resolve('./dist', 'index.html')
+    ).then(res => {
+        console.log('html end');
+    })
 
-    fs.writeFileSync(`../dist/${outputFilename}`, result)
+    fs.writeFileSync(path.resolve('./dist', outputFilename), result)
 
 }
 
