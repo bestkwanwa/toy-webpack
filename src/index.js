@@ -5,7 +5,20 @@ import traverse from '@babel/traverse';
 import { transformFromAst } from 'babel-core';
 import ejs from 'ejs';
 
+import { jsonLoader } from './jsonLoader.js';
+
 let id = 0
+
+const config = {
+    module: {
+        rules: [
+            {
+                test: /\.json$/,
+                use: [jsonLoader]
+            },
+        ],
+    },
+}
 
 /**
  * To access the info of file.
@@ -13,9 +26,30 @@ let id = 0
  * @returns {Object}
  */
 function createAsset(filePath) {
-    const sourceCode = fs.readFileSync(filePath, {
+    let sourceCode = fs.readFileSync(filePath, {
         encoding: 'utf-8'
     })
+
+    const loaders = config.module.rules
+
+    const loaderContext = {
+        addDeps(dep) {
+            console.log('add deps:', dep);
+        }
+    }
+
+    loaders.forEach(({ test, use }) => {
+        if (test.test(filePath)) {
+            if (Array.isArray(use)) {
+                use.reverse().forEach(fn => {
+                    sourceCode = fn.call(loaderContext, sourceCode)
+                })
+            } else {
+                sourceCode = use.call(loaderContext, sourceCode)
+            }
+        }
+    })
+
     const ast = parser.parse(sourceCode, {
         sourceType: 'module'
     })

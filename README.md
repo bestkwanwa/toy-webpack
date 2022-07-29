@@ -2,6 +2,7 @@ TODO:
 - 循环引用
 - 重复引用，即一个引用只有一个id
 - 升级babel
+- esm改为cjs
 
 Feature:
 - 读文件
