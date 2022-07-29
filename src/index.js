@@ -4,8 +4,10 @@ import parser from '@babel/parser';
 import traverse from '@babel/traverse';
 import { transformFromAst } from 'babel-core';
 import ejs from 'ejs';
+import { SyncHook } from 'tapable';
 
 import { jsonLoader } from './jsonLoader.js';
+import { ChangeOutputFilename } from './ChangeOutputFilename.js';
 
 let id = 0
 
@@ -18,6 +20,18 @@ const config = {
             },
         ],
     },
+    plugins: [new ChangeOutputFilename()]
+}
+
+const hooks = {
+    emitChange: new SyncHook(['pluginContext']),
+}
+
+function initPlugins() {
+    const plugins = config.plugins
+    plugins.forEach(plugin => {
+        plugin.apply(hooks)
+    })
 }
 
 /**
@@ -119,11 +133,22 @@ function build(graph) {
 
     const result = ejs.render(template, { data })
 
+    let outputFilename = 'bundle.js'
+
+    const pluginContext = {
+        changeOutputFilename(name) {
+            outputFilename = name
+        }
+    }
+
+    hooks.emitChange.call(pluginContext)
+
     !fs.existsSync('../dist') && fs.mkdirSync('../dist')
 
-    fs.writeFileSync('../dist/bundle.js', result)
+    fs.writeFileSync(`../dist/${outputFilename}`, result)
 
 }
 
+initPlugins()
 build(createGraph())
 

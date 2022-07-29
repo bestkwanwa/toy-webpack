@@ -11,7 +11,10 @@
     "type": "git",
     "url": "git+https://github.com/bestkwanwa/toy-webpack.git"
   },
-  "keywords": ["toy","webpack"],
+  "keywords": [
+    "toy",
+    "webpack"
+  ],
   "author": "bestkwanwa",
   "license": "ISC",
   "bugs": {
@@ -23,6 +26,7 @@
     "@babel/traverse": "^7.18.9",
     "babel-core": "^6.26.3",
     "babel-preset-env": "^1.7.0",
-    "ejs": "^3.1.8"
+    "ejs": "^3.1.8",
+    "tapable": "^2.2.1"
   }
 }
